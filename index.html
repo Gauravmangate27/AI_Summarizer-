@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Research Paper Summarizer</title>
+    <style>
+        :root {
+            --color-bg-primary: #fcfcf9;
+            --color-bg-secondary: #fffffe;
+            --color-text-primary: #134252;
+            --color-text-secondary: #626c71;
+            --color-accent: #21808d;
+            --color-accent-hover: #1d7480;
+            --color-border: rgba(94, 82, 64, 0.2);
+            --color-error: #c0152f;
+            --color-success: #21808d;
+        }
+
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --color-bg-primary: #1f2121;
+                --color-bg-secondary: #262828;
+                --color-text-primary: #f5f5f5;
+                --color-text-secondary: rgba(167, 169, 169, 0.7);
+                --color-accent: #32b8c6;
+                --color-accent-hover: #2da6b2;
+                --color-border: rgba(119, 124, 124, 0.3);
+                --color-error: #ff5459;
+                --color-success: #32b8c6;
+            }
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px 0;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, var(--color-accent), #1a6873);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .subtitle {
+            color: var(--color-text-secondary);
+            font-size: 1.1em;
+        }
+
+        .input-section {
+            background: var(--color-bg-secondary);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+            border: 1px solid var(--color-border);
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+            border-bottom: 2px solid var(--color-border);
+        }
+
+        .tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 1em;
+            color: var(--color-text-secondary);
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+            margin-bottom: -2px;
+        }
+
+        .tab.active {
+            color: var(--color-accent);
+            border-bottom-color: var(--color-accent);
+            font-weight: 600;
+        }
+
+        .tab:hover:not(.active) {
+            color: var(--color-text-primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: var(--color-text-primary);
+        }
+
+        input[type="text"],
+        input[type="url"],
+        textarea,
+        select {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            font-size: 1em;
+            background: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            transition: all 0.3s ease;
+        }
+
+        input:focus,
+        textarea:focus,
+        select:focus {
+            outline: none;
+            border-color: var(--color-accent);
+            box-shadow: 0 0 0 3px rgba(33, 128, 141, 0.1);
+        }
+
+        textarea {
+            min-height: 150px;
+            resize: vertical;
+            font-family: inherit;
+        }
+
+        .btn {
+            padding: 12px 28px;
+            background: var(--color-accent);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            background: var(--color-accent-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 128, 141, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: var(--color-bg-primary);
+            color: var(--color-text-primary);
+            border: 1px solid var(--color-border);
+        }
+
+        .btn-secondary:hover {
+            background: var(--color-border);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 30px;
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid var(--color-border);
+            border-top: 4px solid var(--color-accent);
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            background: var(--color-bg-secondary);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            border: 1px solid var(--color-border);
+        }
+
+        .results.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .paper-info {
+            background: var(--color-bg-primary);
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 25px;
+            border-left: 4px solid var(--color-accent);
+        }
+
+        .paper-title {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+            color: var(--color-text-primary);
+        }
+
+        .paper-meta {
+            color: var(--color-text-secondary);
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .summary-section {
+            margin-top: 25px;
+        }
+
+        .summary-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .summary-text {
+            background: var(--color-bg-primary);
+            padding: 20px;
+            border-radius: 8px;
+            line-height: 1.8;
+            border: 1px solid var(--color-border);
+        }
+
+        .insights-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 15px;
+        }
+
+        .insight-card {
+            background: var(--color-bg-primary);
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            transition: all 0.3s ease;
+        }
+
+        .insight-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(33, 128, 141, 0.15);
+        }
+
+        .insight-card h3 {
+            font-size: 1.1em;
+            margin-bottom: 12px;
+            color: var(--color-accent);
+        }
+
+        .insight-text {
+            color: var(--color-text-primary);
+            line-height: 1.7;
+        }
+
+        .insight-text ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+
+        .insight-text li {
+            margin: 8px 0;
+        }
+
+        .chat-container {
+            background: var(--color-bg-primary);
+            border-radius: 8px;
+            border: 1px solid var(--color-border);
+            overflow: hidden;
+        }
+
+        .chat-messages {
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .chat-message {
+            display: flex;
+            gap: 12px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .chat-message.user {
+            flex-direction: row-reverse;
+        }
+
+        .chat-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2em;
+            flex-shrink: 0;
+        }
+
+        .chat-message.user .chat-avatar {
+            background: var(--color-accent);
+            color: white;
+        }
+
+        .chat-message.bot .chat-avatar {
+            background: var(--color-bg-secondary);
+            border: 2px solid var(--color-border);
+        }
+
+        .chat-bubble {
+            background: var(--color-bg-secondary);
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 70%;
+            border: 1px solid var(--color-border);
+            line-height: 1.6;
+        }
+
+        .chat-message.user .chat-bubble {
+            background: var(--color-accent);
+            color: white;
+            border-color: var(--color-accent);
+        }
+
+        .chat-input-area {
+            display: flex;
+            gap: 10px;
+            padding: 15px;
+            border-top: 1px solid var(--color-border);
+            background: var(--color-bg-secondary);
+        }
+
+        .chat-input-area input {
+            flex: 1;
+            margin: 0;
+        }
+
+        .chat-input-area .btn {
+            margin: 0;
+        }
+
+        .chat-thinking {
+            display: flex;
+            gap: 5px;
+            padding: 10px 0;
+        }
+
+        .chat-thinking span {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--color-accent);
+            animation: bounce 1.4s infinite ease-in-out;
+        }
+
+        .chat-thinking span:nth-child(1) { animation-delay: -0.32s; }
+        .chat-thinking span:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+
+        .error {
+            background: rgba(192, 21, 47, 0.1);
+            color: var(--color-error);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid var(--color-error);
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .success {
+            background: rgba(33, 128, 141, 0.1);
+            color: var(--color-success);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            border: 1px solid var(--color-success);
+        }
+
+        .settings {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .slider-container {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .slider-value {
+            color: var(--color-accent);
+            font-weight: 600;
+            margin-top: 5px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            margin-top: 10px;
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            width: 100%;
+        }
+
+        .file-input-wrapper input[type=file] {
+            position: absolute;
+            left: -9999px;
+        }
+
+        .file-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            border: 2px dashed var(--color-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--color-bg-primary);
+        }
+
+        .file-label:hover {
+            border-color: var(--color-accent);
+            background: rgba(33, 128, 141, 0.05);
+        }
+
+        .file-name {
+            margin-top: 10px;
+            color: var(--color-text-secondary);
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 1.8em; }
+            .input-section { padding: 20px; }
+            .tabs { flex-wrap: wrap; }
+            .settings { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 AI Research Paper Summarizer</h1>
+            <p class="subtitle">Extract and summarize research papers from arXiv, PDF files, or text</p>
+            <div class="success" style="display: block; margin-top: 20px;">
+                <p style="margin: 0;">
+                    ✅ <strong>Backend Connected!</strong> Your Flask server is running on <code>http://localhost:5000</code>
+                </p>
+            </div>
+        </header>
+
+        <div class="input-section">
+            <div class="tabs">
+                <button class="tab active" data-tab="url">arXiv URL</button>
+                <button class="tab" data-tab="pdf">PDF Upload</button>
+                <button class="tab" data-tab="text">Direct Text</button>
+                <button class="tab" data-tab="youtube">YouTube Video</button>
+            </div>
+
+            <div class="tab-content active" id="url-content">
+                <div class="form-group">
+                    <label for="arxiv-url">Enter arXiv Paper URL or ID</label>
+                    <input type="url" id="arxiv-url" placeholder="https://arxiv.org/abs/2103.00020 or 2103.00020">
+                </div>
+                <button class="btn" onclick="fetchArxivPaper()">
+                    <span>📥</span> Fetch &amp; Summarize
+                </button>
+            </div>
+
+            <div class="tab-content" id="pdf-content">
+                <div class="form-group">
+                    <label>Upload PDF File</label>
+                    <div class="file-input-wrapper">
+                        <input type="file" id="pdf-file" accept=".pdf" onchange="handleFileSelect(event)">
+                        <label for="pdf-file" class="file-label">
+                            📄 Click to select PDF file or drag and drop
+                        </label>
+                    </div>
+                    <div class="file-name" id="file-name"></div>
+                </div>
+                <button class="btn" onclick="processPDF()">
+                    <span>📄</span> Extract &amp; Summarize
+                </button>
+            </div>
+
+            <div class="tab-content" id="text-content">
+                <div class="form-group">
+                    <label for="direct-text">Paste Paper Text</label>
+                    <textarea id="direct-text" placeholder="Paste the paper content here..."></textarea>
+                </div>
+                <button class="btn" onclick="summarizeText()">
+                    <span>✨</span> Summarize
+                </button>
+            </div>
+
+            <div class="tab-content" id="youtube-content">
+                <div class="form-group">
+                    <label for="youtube-url">Enter YouTube Video URL</label>
+                    <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
+                </div>
+                <button class="btn" onclick="summarizeYouTube()">
+                    <span>🎥</span> Extract &amp; Summarize
+                </button>
+            </div>
+
+            <div class="settings">
+                <div class="slider-container">
+                    <label for="summary-length">Summary Length</label>
+                    <select id="summary-length">
+                        <option value="short">Short (20%)</option>
+                        <option value="medium" selected>Medium (30%)</option>
+                        <option value="long">Long (50%)</option>
+                    </select>
+                </div>
+                <div class="slider-container">
+                    <label for="model-type">AI Model</label>
+                    <select id="model-type">
+                        <option value="extractive">Extractive (Fast)</option>
+                        <option value="abstractive" selected>Abstractive (AI-powered)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processing paper... This may take a moment.</p>
+        </div>
+
+        <div class="error" id="error"></div>
+
+        <div class="results" id="results">
+            <div class="paper-info" id="paper-info"></div>
+            
+            <div class="summary-section">
+                <div class="summary-header">
+                    <h2>📝 Summary</h2>
+                    <button class="btn btn-secondary" onclick="copySummary()">
+                        📋 Copy Summary
+                    </button>
+                </div>
+                <div class="summary-text" id="summary-text"></div>
+            </div>
+
+            <div class="insights-section" id="insights-section" style="display: none; margin-top: 25px;">
+                <div class="summary-header">
+                    <h2>🧠 AI Insights &amp; Suggestions</h2>
+                    <button class="btn btn-secondary" onclick="regenerateInsights()">
+                        🔄 Regenerate
+                    </button>
+                </div>
+                <div class="insights-content">
+                    <div class="insight-card">
+                        <h3>💡 Key Insights</h3>
+                        <div id="key-insights" class="insight-text"></div>
+                    </div>
+                    <div class="insight-card">
+                        <h3>🎯 Research Implications</h3>
+                        <div id="implications" class="insight-text"></div>
+                    </div>
+                    <div class="insight-card">
+                        <h3>📚 Recommended Reading</h3>
+                        <div id="recommendations" class="insight-text"></div>
+                    </div>
+                    <div class="insight-card">
+                        <h3>❓ Critical Questions</h3>
+                        <div id="questions" class="insight-text"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-section" id="chat-section" style="display: none; margin-top: 25px;">
+                <div class="summary-header">
+                    <h2>💬 Chat with Your Paper</h2>
+                    <button class="btn btn-secondary" onclick="clearChat()">
+                        🗑️ Clear Chat
+                    </button>
+                </div>
+                <div class="chat-container" id="chat-container">
+                    <div class="chat-messages" id="chat-messages"></div>
+                    <div class="chat-input-area">
+                        <input type="text" id="chat-input" placeholder="Ask a question about the paper..." onkeypress="handleChatKeypress(event)">
+                        <button class="btn" onclick="sendChatMessage()">
+                            <span>📤</span> Send
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                const targetTab = tab.dataset.tab;
+                
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                tab.classList.add('active');
+                document.getElementById(`${targetTab}-content`).classList.add('active');
+            });
+        });
+
+        // File selection handler
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file) {
+                document.getElementById('file-name').textContent = `Selected: ${file.name}`;
+            }
+        }
+
+        // Show loading state
+        function showLoading() {
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('results').classList.remove('active');
+            document.getElementById('error').classList.remove('active');
+        }
+
+        // Hide loading state
+        function hideLoading() {
+            document.getElementById('loading').classList.remove('active');
+        }
+
+        // Show error
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.classList.add('active');
+            hideLoading();
+        }
+
+        // Show results
+        function showResults(paperInfo, summary) {
+            hideLoading();
+            
+            const paperInfoDiv = document.getElementById('paper-info');
+            paperInfoDiv.innerHTML = `
+                <h3 class="paper-title">${paperInfo.title}</h3>
+                ${paperInfo.authors ? `<p class="paper-meta"><strong>Authors:</strong> ${paperInfo.authors}</p>` : ''}
+                ${paperInfo.published ? `<p class="paper-meta"><strong>Published:</strong> ${paperInfo.published}</p>` : ''}
+                ${paperInfo.categories ? `<p class="paper-meta"><strong>Categories:</strong> ${paperInfo.categories}</p>` : ''}
+            `;
+            
+            document.getElementById('summary-text').textContent = summary;
+            document.getElementById('results').classList.add('active');
+        }
+
+        // Fetch arXiv paper
+        async function fetchArxivPaper() {
+            const urlInput = document.getElementById('arxiv-url').value.trim();
+            if (!urlInput) {
+                showError('Please enter an arXiv URL or paper ID');
+                return;
+            }
+
+            showLoading();
+
+            // Extract arXiv ID from URL or use direct ID
+            let arxivId = urlInput;
+            const urlMatch = urlInput.match(/arxiv\.org\/abs\/([0-9.]+)/);
+            if (urlMatch) {
+                arxivId = urlMatch[1];
+            }
+
+            try {
+                const response = await fetch('http://localhost:5000/api/summarize/arxiv', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        arxiv_id: arxivId,
+                        summary_length: document.getElementById('summary-length').value,
+                        model_type: document.getElementById('model-type').value
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showResults(data.paper_info, data.summary);
+                    if (data.insights) {
+                        displayInsights(data.insights);
+                    }
+                }
+            } catch (error) {
+                showError('Failed to connect to backend. Make sure Flask server is running on http://localhost:5000');
+                console.error('Error:', error);
+            }
+        }
+
+        // Process PDF
+        async function processPDF() {
+            const fileInput = document.getElementById('pdf-file');
+            if (!fileInput.files || !fileInput.files[0]) {
+                showError('Please select a PDF file');
+                return;
+            }
+
+            showLoading();
+
+            const formData = new FormData();
+            formData.append('pdf', fileInput.files[0]);
+            formData.append('summary_length', document.getElementById('summary-length').value);
+            formData.append('model_type', document.getElementById('model-type').value);
+
+            try {
+                const response = await fetch('http://localhost:5000/api/summarize/pdf', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showResults(data.paper_info, data.summary);
+                    if (data.insights) {
+                        displayInsights(data.insights);
+                    }
+                }
+            } catch (error) {
+                showError('Failed to connect to backend. Make sure Flask server is running on http://localhost:5000');
+                console.error('Error:', error);
+            }
+        }
+
+        // Summarize direct text
+        async function summarizeText() {
+            const text = document.getElementById('direct-text').value.trim();
+            if (!text) {
+                showError('Please paste some text to summarize');
+                return;
+            }
+
+            if (text.length < 100) {
+                showError('Text is too short. Please provide at least 100 characters.');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const response = await fetch('http://localhost:5000/api/summarize/text', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: text,
+                        summary_length: document.getElementById('summary-length').value,
+                        model_type: document.getElementById('model-type').value
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showResults(data.paper_info, data.summary);
+                    if (data.insights) {
+                        displayInsights(data.insights);
+                    }
+                }
+            } catch (error) {
+                showError('Failed to connect to backend. Make sure Flask server is running on http://localhost:5000');
+                console.error('Error:', error);
+            }
+        }
+
+        // Summarize YouTube video
+        async function summarizeYouTube() {
+            const urlInput = document.getElementById('youtube-url').value.trim();
+            if (!urlInput) {
+                showError('Please enter a YouTube URL');
+                return;
+            }
+
+            showLoading();
+
+            try {
+                const response = await fetch('http://localhost:5000/api/summarize/youtube', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        youtube_url: urlInput,
+                        summary_length: document.getElementById('summary-length').value,
+                        model_type: document.getElementById('model-type').value
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showResults(data.paper_info, data.summary);
+                    if (data.insights) {
+                        displayInsights(data.insights);
+                    }
+                }
+            } catch (error) {
+                showError('Failed to connect to backend. Make sure Flask server is running on http://localhost:5000');
+                console.error('Error:', error);
+            }
+        }
+
+        // Generate AI insights - removed function, insights now come from backend
+
+        // Display insights in UI
+        function displayInsights(insights) {
+            document.getElementById('key-insights').innerHTML = 
+                '<ul>' + insights.keyInsights.map(i => `<li>${i}</li>`).join('') + '</ul>';
+            
+            document.getElementById('implications').innerHTML = 
+                '<ul>' + insights.implications.map(i => `<li>${i}</li>`).join('') + '</ul>';
+            
+            document.getElementById('recommendations').innerHTML = 
+                '<ul>' + insights.recommendations.map(i => `<li>${i}</li>`).join('') + '</ul>';
+            
+            document.getElementById('questions').innerHTML = 
+                '<ul>' + insights.questions.map(q => `<li>${q}</li>`).join('') + '</ul>';
+            
+            // Show insights section
+            document.getElementById('insights-section').style.display = 'block';
+            
+            // Show chat section after insights are displayed
+            document.getElementById('chat-section').style.display = 'block';
+            
+            // Store paper context globally for chat
+            window.paperContext = {
+                summary: document.getElementById('summary-text').textContent,
+                title: document.querySelector('.paper-title')?.textContent || 'Content',
+                fullText: window.currentPaperText || ''
+            };
+        }
+
+        // Regenerate insights
+        async function regenerateInsights() {
+            const summaryText = document.getElementById('summary-text').textContent;
+            const title = document.querySelector('.paper-title')?.textContent || 'Content';
+            
+            showLoading();
+
+            try {
+                const response = await fetch('http://localhost:5000/api/generate-insights', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        summary: summaryText,
+                        title: title
+                    })
+                });
+
+                const data = await response.json();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    displayInsights(data.insights);
+                }
+                hideLoading();
+            } catch (error) {
+                showError('Failed to generate insights. Please try again.');
+                hideLoading();
+            }
+        }
+
+        // Copy summary to clipboard
+        function copySummary() {
+            const summaryText = document.getElementById('summary-text').textContent;
+            navigator.clipboard.writeText(summaryText).then(() => {
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '✓ Copied!';
+                setTimeout(() => {
+                    btn.innerHTML = originalText;
+                }, 2000);
+            });
+        }
+
+        // Chat functionality
+        let chatHistory = [];
+
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        function addChatMessage(message, isUser) {
+            const chatMessages = document.getElementById('chat-messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'user' : 'bot'}`;
+            
+            messageDiv.innerHTML = `
+                <div class="chat-avatar">${isUser ? '👤' : '🤖'}</div>
+                <div class="chat-bubble">${message}</div>
+            `;
+            
+            chatMessages.appendChild(messageDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function showChatThinking() {
+            const chatMessages = document.getElementById('chat-messages');
+            const thinkingDiv = document.createElement('div');
+            thinkingDiv.id = 'chat-thinking';
+            thinkingDiv.className = 'chat-message bot';
+            thinkingDiv.innerHTML = `
+                <div class="chat-avatar">🤖</div>
+                <div class="chat-bubble">
+                    <div class="chat-thinking">
+                        <span></span><span></span><span></span>
+                    </div>
+                </div>
+            `;
+            chatMessages.appendChild(thinkingDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function removeChatThinking() {
+            const thinkingDiv = document.getElementById('chat-thinking');
+            if (thinkingDiv) {
+                thinkingDiv.remove();
+            }
+        }
+
+        async function sendChatMessage() {
+            const input = document.getElementById('chat-input');
+            const question = input.value.trim();
+            
+            if (!question) return;
+            
+            if (!window.paperContext) {
+                showError('Please load a paper first before chatting.');
+                return;
+            }
+            
+            // Add user message
+            addChatMessage(question, true);
+            chatHistory.push({ role: 'user', content: question });
+            
+            // Clear input
+            input.value = '';
+            
+            // Show thinking indicator
+            showChatThinking();
+            
+            try {
+                const response = await fetch('http://localhost:5000/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        question: question,
+                        context: window.paperContext,
+                        history: chatHistory
+                    })
+                });
+                
+                const data = await response.json();
+                
+                removeChatThinking();
+                
+                if (data.error) {
+                    addChatMessage('Sorry, I encountered an error: ' + data.error, false);
+                } else {
+                    addChatMessage(data.answer, false);
+                    chatHistory.push({ role: 'assistant', content: data.answer });
+                }
+            } catch (error) {
+                removeChatThinking();
+                addChatMessage('Failed to connect to backend. Make sure Flask server is running.', false);
+                console.error('Error:', error);
+            }
+        }
+
+        function clearChat() {
+            document.getElementById('chat-messages').innerHTML = '';
+            chatHistory = [];
+            addChatMessage('Chat cleared. Ask me anything about the paper!', false);
+        }
+    </script>
+</body>
+</html>
+
