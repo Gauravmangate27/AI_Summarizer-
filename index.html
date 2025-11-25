@@ -6,29 +6,16 @@
     <title>AI Research Paper Summarizer</title>
     <style>
         :root {
-            --color-bg-primary: #fcfcf9;
-            --color-bg-secondary: #fffffe;
-            --color-text-primary: #134252;
-            --color-text-secondary: #626c71;
-            --color-accent: #21808d;
-            --color-accent-hover: #1d7480;
-            --color-border: rgba(94, 82, 64, 0.2);
-            --color-error: #c0152f;
-            --color-success: #21808d;
-        }
-
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --color-bg-primary: #1f2121;
-                --color-bg-secondary: #262828;
-                --color-text-primary: #f5f5f5;
-                --color-text-secondary: rgba(167, 169, 169, 0.7);
-                --color-accent: #32b8c6;
-                --color-accent-hover: #2da6b2;
-                --color-border: rgba(119, 124, 124, 0.3);
-                --color-error: #ff5459;
-                --color-success: #32b8c6;
-            }
+            --color-bg-primary: #ffffff;
+            --color-bg-secondary: #f8fafc; /* light blue-gray */
+            --color-text-primary: #1e293b;  /* slate-800 */
+            --color-text-secondary: #64748b; /* slate-500 */
+            --color-accent: #2563eb; /* blue-600 */
+            --color-accent-hover: #1d4ed8; /* blue-700 */
+            --color-accent-light: #dbeafe; /* blue-100 */
+            --color-border: #e2e8f0; /* slate-200 */
+            --color-error: #dc2626; /* red-600 */
+            --color-success: #16a34a; /* green-600 */
         }
 
         * {
@@ -42,7 +29,7 @@
             background: var(--color-bg-primary);
             color: var(--color-text-primary);
             line-height: 1.6;
-            padding: 20px;
+            padding: 24px;
         }
 
         .container {
@@ -52,17 +39,15 @@
 
         header {
             text-align: center;
-            margin-bottom: 40px;
-            padding: 30px 0;
+            margin-bottom: 32px;
+            padding: 16px 0;
         }
 
         h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            background: linear-gradient(135deg, var(--color-accent), #1a6873);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+            color: var(--color-text-primary);
         }
 
         .subtitle {
@@ -72,30 +57,29 @@
 
         .input-section {
             background: var(--color-bg-secondary);
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            margin-bottom: 30px;
+            padding: 24px;
+            border-radius: 10px;
+            margin-bottom: 24px;
             border: 1px solid var(--color-border);
         }
 
         .tabs {
             display: flex;
-            gap: 10px;
-            margin-bottom: 25px;
-            border-bottom: 2px solid var(--color-border);
+            gap: 8px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--color-border);
         }
 
         .tab {
-            padding: 12px 24px;
+            padding: 10px 14px;
             background: transparent;
             border: none;
             cursor: pointer;
-            font-size: 1em;
+            font-size: 0.95em;
             color: var(--color-text-secondary);
-            border-bottom: 3px solid transparent;
-            transition: all 0.3s ease;
-            margin-bottom: -2px;
+            border-bottom: 2px solid transparent;
+            transition: color 0.2s ease, border-color 0.2s ease;
+            margin-bottom: -1px;
         }
 
         .tab.active {
@@ -105,7 +89,7 @@
         }
 
         .tab:hover:not(.active) {
-            color: var(--color-text-primary);
+            color: var(--color-accent);
         }
 
         .tab-content {
@@ -122,9 +106,7 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        .form-group {
-            margin-bottom: 20px;
-        }
+        .form-group { margin-bottom: 16px; }
 
         label {
             display: block;
@@ -138,13 +120,13 @@
         textarea,
         select {
             width: 100%;
-            padding: 12px 16px;
+            padding: 10px 12px;
             border: 1px solid var(--color-border);
             border-radius: 8px;
-            font-size: 1em;
+            font-size: 0.95em;
             background: var(--color-bg-primary);
             color: var(--color-text-primary);
-            transition: all 0.3s ease;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
 
         input:focus,
@@ -152,7 +134,7 @@
         select:focus {
             outline: none;
             border-color: var(--color-accent);
-            box-shadow: 0 0 0 3px rgba(33, 128, 141, 0.1);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14); /* blue focus ring */
         }
 
         textarea {
@@ -162,25 +144,21 @@
         }
 
         .btn {
-            padding: 12px 28px;
+            padding: 10px 14px;
             background: var(--color-accent);
             color: white;
             border: none;
             border-radius: 8px;
-            font-size: 1em;
+            font-size: 0.95em;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: background 0.2s ease;
             display: inline-flex;
             align-items: center;
             gap: 8px;
         }
 
-        .btn:hover {
-            background: var(--color-accent-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(33, 128, 141, 0.3);
-        }
+        .btn:hover { background: var(--color-accent-hover); }
 
         .btn:disabled {
             opacity: 0.6;
@@ -188,14 +166,14 @@
             transform: none;
         }
 
-        .btn-secondary {
-            background: var(--color-bg-primary);
-            color: var(--color-text-primary);
-            border: 1px solid var(--color-border);
+        .btn-secondary { 
+            background: white; 
+            color: var(--color-text-primary); 
+            border: 1px solid var(--color-border); 
         }
-
-        .btn-secondary:hover {
-            background: var(--color-border);
+        .btn-secondary:hover { 
+            background: var(--color-accent-light); 
+            border-color: var(--color-accent);
         }
 
         .loading {
@@ -226,9 +204,8 @@
         .results {
             display: none;
             background: var(--color-bg-secondary);
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+            border-radius: 10px;
             border: 1px solid var(--color-border);
         }
 
@@ -238,17 +215,17 @@
         }
 
         .paper-info {
-            background: var(--color-bg-primary);
-            padding: 20px;
+            background: white;
+            padding: 16px;
             border-radius: 8px;
-            margin-bottom: 25px;
-            border-left: 4px solid var(--color-accent);
+            margin-bottom: 20px;
+            border: 1px solid var(--color-border);
         }
 
-        .paper-title {
-            font-size: 1.5em;
-            margin-bottom: 10px;
-            color: var(--color-text-primary);
+        .paper-title { 
+            font-size: 1.25em; 
+            margin-bottom: 8px; 
+            color: var(--color-text-primary); 
         }
 
         .paper-meta {
@@ -261,19 +238,19 @@
             margin-top: 25px;
         }
 
-        .summary-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
+        .summary-header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+            margin-bottom: 12px; 
         }
 
-        .summary-text {
-            background: var(--color-bg-primary);
-            padding: 20px;
-            border-radius: 8px;
-            line-height: 1.8;
-            border: 1px solid var(--color-border);
+        .summary-text { 
+            background: white; 
+            padding: 16px; 
+            border-radius: 8px; 
+            line-height: 1.75; 
+            border: 1px solid var(--color-border); 
         }
 
         .insights-content {
@@ -283,23 +260,17 @@
             margin-top: 15px;
         }
 
-        .insight-card {
-            background: var(--color-bg-primary);
-            padding: 20px;
-            border-radius: 8px;
-            border: 1px solid var(--color-border);
-            transition: all 0.3s ease;
+        .insight-card { 
+            background: white; 
+            padding: 16px; 
+            border-radius: 8px; 
+            border: 1px solid var(--color-border); 
         }
 
-        .insight-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(33, 128, 141, 0.15);
-        }
-
-        .insight-card h3 {
-            font-size: 1.1em;
-            margin-bottom: 12px;
-            color: var(--color-accent);
+        .insight-card h3 { 
+            font-size: 1em; 
+            margin-bottom: 8px; 
+            color: var(--color-text-primary); 
         }
 
         .insight-text {
@@ -317,7 +288,7 @@
         }
 
         .chat-container {
-            background: var(--color-bg-primary);
+            background: white;
             border-radius: 8px;
             border: 1px solid var(--color-border);
             overflow: hidden;
@@ -364,8 +335,8 @@
         }
 
         .chat-message.bot .chat-avatar {
-            background: var(--color-bg-secondary);
-            border: 2px solid var(--color-border);
+            background: var(--color-accent-light);
+            color: var(--color-accent);
         }
 
         .chat-bubble {
@@ -377,10 +348,10 @@
             line-height: 1.6;
         }
 
-        .chat-message.user .chat-bubble {
-            background: var(--color-accent);
-            color: white;
-            border-color: var(--color-accent);
+        .chat-message.user .chat-bubble { 
+            background: var(--color-accent); 
+            color: white; 
+            border-color: transparent; 
         }
 
         .chat-input-area {
@@ -423,7 +394,7 @@
         }
 
         .error {
-            background: rgba(192, 21, 47, 0.1);
+            background: rgba(220, 38, 38, 0.1);
             color: var(--color-error);
             padding: 15px;
             border-radius: 8px;
@@ -484,17 +455,17 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 40px;
-            border: 2px dashed var(--color-border);
+            padding: 28px;
+            border: 1px dashed var(--color-border);
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: var(--color-bg-primary);
+            transition: background 0.2s ease, border-color 0.2s ease;
+            background: white;
         }
 
         .file-label:hover {
             border-color: var(--color-accent);
-            background: rgba(33, 128, 141, 0.05);
+            background: var(--color-accent-light);
         }
 
         .file-name {
@@ -504,7 +475,7 @@
         }
 
         @media (max-width: 768px) {
-            h1 { font-size: 1.8em; }
+            h1 { font-size: 1.5rem; }
             .input-section { padding: 20px; }
             .tabs { flex-wrap: wrap; }
             .settings { grid-template-columns: 1fr; }
@@ -514,21 +485,17 @@
 <body>
     <div class="container">
         <header>
-            <h1>🤖 AI Research Paper Summarizer</h1>
-            <p class="subtitle">Extract and summarize research papers from arXiv, PDF files, or text</p>
-            <div class="success" style="display: block; margin-top: 20px;">
-                <p style="margin: 0;">
-                    ✅ <strong>Backend Connected!</strong> Your Flask server is running on <code>http://localhost:5000</code>
-                </p>
-            </div>
+            <h1>AI Research Paper Summarizer</h1>
+            <p class="subtitle">Summarize arXiv links, PDFs, or plain text.</p>
         </header>
 
         <div class="input-section">
             <div class="tabs">
-                <button class="tab active" data-tab="url">arXiv URL</button>
-                <button class="tab" data-tab="pdf">PDF Upload</button>
-                <button class="tab" data-tab="text">Direct Text</button>
-                <button class="tab" data-tab="youtube">YouTube Video</button>
+                <button class="tab active" data-tab="url">arXiv</button>
+                <button class="tab" data-tab="generic">Link</button>
+                <!-- <button class="tab" data-tab="drive">Drive</button> -->
+                <button class="tab" data-tab="pdf">PDF</button>
+                <button class="tab" data-tab="text">Text</button>
             </div>
 
             <div class="tab-content active" id="url-content">
@@ -536,9 +503,7 @@
                     <label for="arxiv-url">Enter arXiv Paper URL or ID</label>
                     <input type="url" id="arxiv-url" placeholder="https://arxiv.org/abs/2103.00020 or 2103.00020">
                 </div>
-                <button class="btn" onclick="fetchArxivPaper()">
-                    <span>📥</span> Fetch &amp; Summarize
-                </button>
+                <button class="btn" onclick="fetchArxivPaper()">Fetch and summarize</button>
             </div>
 
             <div class="tab-content" id="pdf-content">
@@ -546,15 +511,11 @@
                     <label>Upload PDF File</label>
                     <div class="file-input-wrapper">
                         <input type="file" id="pdf-file" accept=".pdf" onchange="handleFileSelect(event)">
-                        <label for="pdf-file" class="file-label">
-                            📄 Click to select PDF file or drag and drop
-                        </label>
+                        <label for="pdf-file" class="file-label">Click to select PDF or drag and drop</label>
                     </div>
                     <div class="file-name" id="file-name"></div>
                 </div>
-                <button class="btn" onclick="processPDF()">
-                    <span>📄</span> Extract &amp; Summarize
-                </button>
+                <button class="btn" onclick="processPDF()">Extract and summarize</button>
             </div>
 
             <div class="tab-content" id="text-content">
@@ -562,9 +523,23 @@
                     <label for="direct-text">Paste Paper Text</label>
                     <textarea id="direct-text" placeholder="Paste the paper content here..."></textarea>
                 </div>
-                <button class="btn" onclick="summarizeText()">
-                    <span>✨</span> Summarize
-                </button>
+                <button class="btn" onclick="summarizeText()">Summarize</button>
+            </div>
+
+            <div class="tab-content" id="generic-content">
+                <div class="form-group">
+                    <label for="generic-url">Enter any public document URL (web page or PDF)</label>
+                    <input type="url" id="generic-url" placeholder="https://example.com/article.html or https://site.com/doc.pdf">
+                </div>
+                <button class="btn" onclick="summarizeGenericUrl()">Fetch and summarize</button>
+            </div>
+
+            <div class="tab-content" id="drive-content">
+                <div class="form-group">
+                    <label for="drive-url">Enter Google Drive share link (anyone with link can view)</label>
+                    <input type="url" id="drive-url" placeholder="https://drive.google.com/file/d/FILE_ID/view">
+                </div>
+                <button class="btn" onclick="summarizeDrive()">Fetch and summarize</button>
             </div>
 
             <div class="tab-content" id="youtube-content">
@@ -572,9 +547,7 @@
                     <label for="youtube-url">Enter YouTube Video URL</label>
                     <input type="url" id="youtube-url" placeholder="https://www.youtube.com/watch?v=VIDEO_ID">
                 </div>
-                <button class="btn" onclick="summarizeYouTube()">
-                    <span>🎥</span> Extract &amp; Summarize
-                </button>
+                <button class="btn" onclick="summarizeYouTube()">Extract and summarize</button>
             </div>
 
             <div class="settings">
@@ -608,36 +581,32 @@
             
             <div class="summary-section">
                 <div class="summary-header">
-                    <h2>📝 Summary</h2>
-                    <button class="btn btn-secondary" onclick="copySummary()">
-                        📋 Copy Summary
-                    </button>
+                    <h2>Summary</h2>
+                    <button class="btn btn-secondary" onclick="copySummary()">Copy summary</button>
                 </div>
                 <div class="summary-text" id="summary-text"></div>
             </div>
 
             <div class="insights-section" id="insights-section" style="display: none; margin-top: 25px;">
                 <div class="summary-header">
-                    <h2>🧠 AI Insights &amp; Suggestions</h2>
-                    <button class="btn btn-secondary" onclick="regenerateInsights()">
-                        🔄 Regenerate
-                    </button>
+                    <h2>Insights</h2>
+                    <button class="btn btn-secondary" onclick="regenerateInsights()">Regenerate</button>
                 </div>
                 <div class="insights-content">
                     <div class="insight-card">
-                        <h3>💡 Key Insights</h3>
+                        <h3>Key insights</h3>
                         <div id="key-insights" class="insight-text"></div>
                     </div>
                     <div class="insight-card">
-                        <h3>🎯 Research Implications</h3>
+                        <h3>Implications</h3>
                         <div id="implications" class="insight-text"></div>
                     </div>
                     <div class="insight-card">
-                        <h3>📚 Recommended Reading</h3>
+                        <h3>Recommended reading</h3>
                         <div id="recommendations" class="insight-text"></div>
                     </div>
                     <div class="insight-card">
-                        <h3>❓ Critical Questions</h3>
+                        <h3>Open questions</h3>
                         <div id="questions" class="insight-text"></div>
                     </div>
                 </div>
@@ -645,18 +614,14 @@
 
             <div class="chat-section" id="chat-section" style="display: none; margin-top: 25px;">
                 <div class="summary-header">
-                    <h2>💬 Chat with Your Paper</h2>
-                    <button class="btn btn-secondary" onclick="clearChat()">
-                        🗑️ Clear Chat
-                    </button>
+                    <h2>Chat</h2>
+                    <button class="btn btn-secondary" onclick="clearChat()">Clear chat</button>
                 </div>
                 <div class="chat-container" id="chat-container">
                     <div class="chat-messages" id="chat-messages"></div>
                     <div class="chat-input-area">
                         <input type="text" id="chat-input" placeholder="Ask a question about the paper..." onkeypress="handleChatKeypress(event)">
-                        <button class="btn" onclick="sendChatMessage()">
-                            <span>📤</span> Send
-                        </button>
+                        <button class="btn" onclick="sendChatMessage()">Send</button>
                     </div>
                 </div>
             </div>
@@ -877,6 +842,80 @@
             }
         }
 
+        // Summarize generic URL
+        async function summarizeGenericUrl() {
+            const urlInput = document.getElementById('generic-url').value.trim();
+            if (!urlInput) {
+                showError('Please enter a URL');
+                return;
+            }
+            if (!/^https?:\/\//i.test(urlInput)) {
+                showError('URL must start with http:// or https://');
+                return;
+            }
+            showLoading();
+            try {
+                const response = await fetch('http://localhost:5000/api/summarize/url', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        url: urlInput,
+                        summary_length: document.getElementById('summary-length').value,
+                        model_type: document.getElementById('model-type').value
+                    })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showResults(data.paper_info, data.summary);
+                    if (data.insights) {
+                        displayInsights(data.insights);
+                    }
+                }
+            } catch (e) {
+                showError('Failed to fetch URL. Ensure the backend is running.');
+                console.error(e);
+            }
+        }
+
+        // Summarize Google Drive document
+        async function summarizeDrive() {
+            const driveUrl = document.getElementById('drive-url').value.trim();
+            if (!driveUrl) {
+                showError('Please enter a Google Drive URL');
+                return;
+            }
+            if (!driveUrl.includes('drive.google.com')) {
+                showError('Please enter a valid Google Drive share link');
+                return;
+            }
+            showLoading();
+            try {
+                const response = await fetch('http://localhost:5000/api/summarize/drive', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        drive_url: driveUrl,
+                        summary_length: document.getElementById('summary-length').value,
+                        model_type: document.getElementById('model-type').value
+                    })
+                });
+                const data = await response.json();
+                if (data.error) {
+                    showError(data.error);
+                } else {
+                    showResults(data.paper_info, data.summary);
+                    if (data.insights) {
+                        displayInsights(data.insights);
+                    }
+                }
+            } catch (e) {
+                showError('Failed to fetch Drive document. Ensure the backend is running.');
+                console.error(e);
+            }
+        }
+
         // Generate AI insights - removed function, insights now come from backend
 
         // Display insights in UI
@@ -1054,4 +1093,3 @@
     </script>
 </body>
 </html>
-
