@@ -10,11 +10,18 @@ from sumy.nlp.tokenizers import Tokenizer
 from sumy.summarizers.lex_rank import LexRankSummarizer
 import nltk
 from youtube_transcript_api import YouTubeTranscriptApi
-import google.generativeai as genai
+from google import genai
+import requests
+from bs4 import BeautifulSoup
+import gdown
 import json
 import whisper
-import dotenv
-loaded = dotenv.load_dotenv()
+try:
+    from dotenv import load_dotenv
+    # Attempt to load .env; if parse errors occur we fallback to a manual parser.
+    load_dotenv()
+except ImportError:
+    print("WARNING: python-dotenv not installed. .env file won't be loaded. Install with: pip install python-dotenv")
 # Download required NLTK data
 try:
     nltk.download('punkt', quiet=True)
@@ -36,13 +43,136 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 # Google Gemini API Configuration
 GOOGLE_API_KEY = os.environ.get('GOOGLE_API_KEY', '')
 
-if not GOOGLE_API_KEY:
-    print("WARNING: GOOGLE_API_KEY not set. Please set it as environment variable.")
-    print("Get your free API key from: https://makersuite.google.com/app/apikey")
-else:
-    genai.configure(api_key=GOOGLE_API_KEY)
-    gemini_model = genai.GenerativeModel('gemini-2.0-flash-exp')
-    print("✓ Google Gemini initialized successfully")
+gemini_client = None
+gemini_model_name = None
+
+def init_gemini(preferred=None, silent=False):
+    """Initialize Gemini client using the new google.genai.Client API."""
+    global gemini_client, gemini_model_name
+    if not GOOGLE_API_KEY:
+        if not silent:
+            print("WARNING: GOOGLE_API_KEY not set. Get one at https://makersuite.google.com/app/apikey")
+        gemini_client = None
+        gemini_model_name = None
+        return None
+    
+    attempt_list = []
+    desired = (preferred or os.environ.get('GEMINI_MODEL', '').strip())
+    if desired:
+        attempt_list.append(desired)
+    # Common public model names for the new API
+    attempt_list.extend([
+        'gemini-2.0-flash',
+        'gemini-1.5-flash',
+        'gemini-1.5-flash-latest',
+        'gemini-1.5-pro',
+        'gemini-1.5-pro-latest'
+    ])
+    # Deduplicate preserving order
+    seen = set(); ordered = []
+    for name in attempt_list:
+        if name and name not in seen:
+            ordered.append(name); seen.add(name)
+    
+    last_error = None
+    for name in ordered:
+        try:
+            client = genai.Client(api_key=GOOGLE_API_KEY)
+            # Test the model with a simple request
+            response = client.models.generate_content(
+                model=name,
+                contents="Test"
+            )
+            # If successful, set globals
+            gemini_client = client
+            gemini_model_name = name
+            if not silent:
+                print(f"✓ Gemini model initialized: {name}")
+            return client
+        except Exception as e:
+            last_error = e
+            if not silent:
+                print(f"⚠️ Failed model '{name}': {e}")
+            continue
+    
+    print(f"❌ All Gemini model attempts failed. Last error: {last_error}")
+    gemini_client = None
+    gemini_model_name = None
+    return None
+
+def fallback_parse_env(path='.env'):
+    """Simple .env parser tolerant of malformed lines. Only KEY=VALUE pairs kept."""
+    if not os.path.exists(path):
+        return
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            for line in f:
+                raw = line.strip()
+                if not raw or raw.startswith('#'):
+                    continue
+                if ' ' in raw.split('=')[0]:  # invalid key segment with space
+                    continue
+                if raw.startswith('export '):
+                    raw = raw[len('export '):]
+                if '=' not in raw:
+                    continue
+                key, val = raw.split('=', 1)
+                key = key.strip()
+                val = val.strip().strip('"').strip("'")
+                if not key:
+                    continue
+                # Skip lines that look like commands (e.g., setx KEY ...)
+                if key.lower() == 'setx':
+                    continue
+                if re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', key):
+                    os.environ.setdefault(key, val)
+        print("✓ Fallback .env parsing completed")
+    except Exception as e:
+        print(f"⚠️ Fallback .env parser error: {e}")
+
+# If API key still missing after primary load, attempt fallback parsing
+if not os.environ.get('GOOGLE_API_KEY'):
+    fallback_parse_env()
+    # Attempt re-init if key appeared
+    if os.environ.get('GOOGLE_API_KEY') and gemini_client is None:
+        init_gemini(silent=True)
+
+# Perform eager initialization
+init_gemini()
+
+@app.route('/api/models', methods=['GET'])
+def list_models():
+    """Return available Gemini models supporting generateContent (normalized names)."""
+    if not GOOGLE_API_KEY:
+        return jsonify({'error': 'API key not configured'}), 400
+    try:
+        models = []
+        client = genai.Client(api_key=GOOGLE_API_KEY)
+        # List available models
+        available_models = [
+            'gemini-2.0-flash',
+            'gemini-1.5-flash',
+            'gemini-1.5-flash-latest',
+            'gemini-1.5-pro',
+            'gemini-1.5-pro-latest'
+        ]
+        for model_name in available_models:
+            models.append({'name': model_name, 'raw': model_name, 'methods': ['generateContent']})
+        return jsonify({'models': models, 'count': len(models), 'active': gemini_model_name})
+    except Exception as e:
+        return jsonify({'error': f'Failed to list models: {e}'}), 500
+
+@app.route('/api/health', methods=['GET'])
+def health():
+    """Report Gemini configuration status for debugging."""
+    return jsonify({
+        'has_api_key': bool(GOOGLE_API_KEY),
+        'api_key_prefix': GOOGLE_API_KEY[:6] + '...' if GOOGLE_API_KEY else None,
+        'model_initialized': gemini_client is not None,
+        'active_model': gemini_model_name,
+        'env_working_dir': os.getcwd(),
+        'notes': 'If has_api_key is false, ensure .env exists with GOOGLE_API_KEY.'
+    })
 
 # Store paper contexts for chat (in-memory, use database for production)
 paper_contexts = {}
@@ -61,6 +191,113 @@ def extract_text_from_pdf(pdf_path):
         return text.strip()
     except Exception as e:
         raise Exception(f"Error extracting PDF text: {str(e)}")
+
+def fetch_generic_url_content(url):
+    """Fetch and extract textual content from a generic URL (HTML or PDF)."""
+    try:
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        resp = requests.get(url, headers=headers, timeout=15)
+        if resp.status_code >= 400:
+            raise Exception(f"Request failed with status {resp.status_code}")
+        content_type = resp.headers.get('Content-Type', '').lower()
+        # Handle PDF either by header or extension
+        if 'application/pdf' in content_type or url.lower().endswith('.pdf'):
+            tmp_path = os.path.join(app.config['UPLOAD_FOLDER'], 'temp_url_fetch.pdf')
+            with open(tmp_path, 'wb') as f:
+                f.write(resp.content)
+            try:
+                text = extract_text_from_pdf(tmp_path)
+            finally:
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+            return text
+        # Assume HTML/text
+        html = resp.text
+        soup = BeautifulSoup(html, 'html.parser')
+        for tag in soup(['script', 'style', 'noscript', 'header', 'footer', 'aside', 'form', 'nav']):
+            tag.decompose()
+        # Prefer main/article if present
+        main_candidate = soup.find(['main', 'article'])
+        if main_candidate:
+            text = main_candidate.get_text(separator=' ', strip=True)
+        else:
+            text = soup.get_text(separator=' ', strip=True)
+        # Normalize whitespace
+        text = re.sub(r'\s+', ' ', text).strip()
+        # Truncate extremely long pages
+        max_chars = 200000
+        if len(text) > max_chars:
+            text = text[:max_chars]
+        if len(text) < 100:
+            raise Exception("Extracted text too short; page might be mostly dynamic or blocked.")
+        return text
+    except Exception as e:
+        raise Exception(f"Error fetching URL content: {e}")
+
+def extract_drive_file_id(url):
+    """Extract Google Drive file ID from various share link formats."""
+    patterns = [
+        r'/d/([a-zA-Z0-9_-]+)',
+        r'id=([a-zA-Z0-9_-]+)',
+        r'/file/d/([a-zA-Z0-9_-]+)',
+        r'open\?id=([a-zA-Z0-9_-]+)'
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, url)
+        if match:
+            return match.group(1)
+    return None
+
+def fetch_google_drive_document(drive_url):
+    """Download and extract text from Google Drive shared document (PDF or Docs)."""
+    try:
+        file_id = extract_drive_file_id(drive_url)
+        if not file_id:
+            raise Exception("Could not extract file ID from Google Drive URL. Please use a valid Drive share link.")
+        
+        # Try direct PDF download first
+        download_url = f'https://drive.google.com/uc?id={file_id}'
+        temp_path = os.path.join(app.config['UPLOAD_FOLDER'], f'drive_{file_id}.pdf')
+        
+        try:
+            # Use gdown to handle authentication and download
+            # Set fuzzy=False and use direct URL
+            try:
+                output = gdown.download(download_url, temp_path, quiet=False, fuzzy=False)
+            except Exception as gdown_err:
+                # Try alternate method with fuzzy matching
+                output = gdown.download(f'https://drive.google.com/file/d/{file_id}/view', temp_path, quiet=False, fuzzy=True)
+            
+            if not output or not os.path.exists(temp_path):
+                raise Exception("Download failed. Ensure the file is shared with 'Anyone with the link' and try again.")
+            
+            # Check if it's a PDF by reading file header
+            with open(temp_path, 'rb') as f:
+                header = f.read(5)
+                if header.startswith(b'%PDF'):
+                    # It's a PDF
+                    text = extract_text_from_pdf(temp_path)
+                else:
+                    # Might be text or other format
+                    with open(temp_path, 'r', encoding='utf-8', errors='ignore') as tf:
+                        text = tf.read()
+            
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            
+            if not text or len(text) < 100:
+                raise Exception("Extracted text too short or empty")
+            
+            return text
+            
+        except Exception as e:
+            # Clean up on error
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+            raise Exception(f"Failed to download or process Drive file: {str(e)}")
+            
+    except Exception as e:
+        raise Exception(f"Error fetching Google Drive document: {str(e)}")
 
 def fetch_arxiv_paper(arxiv_id):
     """Fetch paper from arXiv using the arxiv API"""
@@ -186,7 +423,11 @@ def get_youtube_metadata(video_id):
 def summarize_with_gemini(text, summary_length='medium'):
     """Summarize text using Google Gemini"""
     try:
-        if not GOOGLE_API_KEY:
+        if not GOOGLE_API_KEY or gemini_client is None:
+            # Attempt lazy initialization if key exists but client missing
+            if GOOGLE_API_KEY and gemini_client is None:
+                init_gemini(silent=True)
+        if not GOOGLE_API_KEY or gemini_client is None:
             return summarize_extractive(text, summary_length)
         
         length_instructions = {
@@ -207,8 +448,11 @@ def summarize_with_gemini(text, summary_length='medium'):
         Provide only the summary, without any preamble or additional commentary.
         """
         
-        response = gemini_model.generate_content(prompt)
-        summary = response.text.strip()
+        response = gemini_client.models.generate_content(
+            model=gemini_model_name,
+            contents=prompt
+        )
+        summary = (response.text or "").strip()
         
         return summary
     
@@ -237,103 +481,115 @@ def summarize_extractive(text, summary_length='medium'):
         raise Exception(f"Extractive summarization error: {str(e)}")
 
 def generate_insights_with_gemini(summary, title, full_text=None):
-    """Generate insights using Google Gemini with improved error handling"""
-    
+    """Generate insights using Google Gemini with improved error handling.
+    Adds provider flag to distinguish gemini vs fallback responses."""
+
+    # Build extended context excerpt
+    context_excerpt = ""
+    if isinstance(full_text, str) and full_text:
+        max_chars = 18000
+        context_excerpt = full_text[:max_chars]
+
     prompt = f"""
-    Analyze the following research summary and provide comprehensive insights in JSON format.
-    
+    You are an expert research assistant. Using the provided paper summary and extended context, extract structured insights.
+
     Title: {title}
     Summary: {summary}
-    
-    Please provide:
-    1. Key Insights (3-4 main points about the core contributions and findings)
-    2. Research Implications (3-4 points about impact, significance, and real-world applications)
-    3. Recommended Reading (3-4 related papers, books, or resources for further study)
-    4. Critical Questions (3-4 important questions this research raises or leaves open)
-    
-    Respond ONLY with valid JSON in this exact format (no markdown, no code blocks):
+    ExtendedContext: {context_excerpt}
+
+    Tasks:
+    1. keyInsights: 3-5 concise bullet points capturing core contributions, methods, or results.
+    2. implications: 3-5 points on impact, applications, or significance.
+    3. recommendations: 3-5 specific, actionable follow-up readings (generic placeholders only if insufficient info).
+    4. questions: 3-5 probing, open research questions emerging from this work.
+
+    Rules:
+    - Output ONLY raw JSON (no backticks, no markdown, no commentary before/after).
+    - Keep each list item under 200 characters.
+    - If information is missing, reason conservatively and avoid fabrication; prefix uncertain items with "Potential:".
+    - Do not include the word 'insight' inside list items.
+
+    JSON Example:
     {{
-        "keyInsights": ["insight 1", "insight 2", "insight 3"],
-        "implications": ["implication 1", "implication 2", "implication 3"],
-        "recommendations": ["recommendation 1", "recommendation 2", "recommendation 3"],
-        "questions": ["question 1", "question 2", "question 3"]
+      "keyInsights": ["..."],
+      "implications": ["..."],
+      "recommendations": ["..."],
+      "questions": ["..."]
     }}
     """
-    
+
     try:
-        if not GOOGLE_API_KEY:
+        if not GOOGLE_API_KEY or gemini_client is None:
+            if GOOGLE_API_KEY and gemini_client is None:
+                init_gemini(silent=True)
             print("⚠️ No API key configured, using fallback insights")
-            return generate_fallback_insights(summary, title)
-        
-        # Generate content with Gemini
-        response = gemini_model.generate_content(
-            prompt,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.7,
-                max_output_tokens=2048
-            )
+            fb = generate_fallback_insights(summary, title)
+            fb['provider'] = 'fallback'
+            return fb
+
+        response = gemini_client.models.generate_content(
+            model=gemini_model_name,
+            contents=prompt,
+            config={
+                'temperature': 0.7,
+                'max_output_tokens': 2048
+            }
         )
-        
-        # Check if response is valid
-        if not response or not response.text:
+
+        if not response or not getattr(response, 'text', None):
             print("⚠️ Empty response from Gemini, using fallback")
-            return generate_fallback_insights(summary, title)
-        
-        insights_text = response.text.strip()
-        
-        # Log the raw response for debugging
-        print(f"✓ Gemini response length: {len(insights_text)} chars")
-        
-        # Clean up the response - remove markdown code blocks if present
+            fb = generate_fallback_insights(summary, title)
+            fb['provider'] = 'fallback'
+            return fb
+
+        insights_text = (response.text or "").strip()
+        print(f"✓ Gemini raw insights length: {len(insights_text)} chars")
+
         insights_text = re.sub(r'```\s*', '', insights_text)
-        insights_text = re.sub(r'```\s*$', '', insights_text)
-        insights_text = insights_text.strip()
-        
-        # If response is too short, likely an error
+        insights_text = re.sub(r'```\s*$', '', insights_text).strip()
+
         if len(insights_text) < 50:
             print(f"⚠️ Response too short: {insights_text}")
-            return generate_fallback_insights(summary, title)
-        
-        # Try to parse JSON
+            fb = generate_fallback_insights(summary, title)
+            fb['provider'] = 'fallback'
+            return fb
+
         try:
             insights = json.loads(insights_text)
         except json.JSONDecodeError as je:
             print(f"⚠️ JSON decode error: {je}")
-            print(f"Raw response: {insights_text[:200]}...")
-            
-            # Try to extract JSON from the response if it's wrapped in text
             json_match = re.search(r'\{[\s\S]*\}', insights_text)
             if json_match:
                 try:
                     insights = json.loads(json_match.group(0))
-                except:
-                    return generate_fallback_insights(summary, title)
+                except Exception:
+                    fb = generate_fallback_insights(summary, title)
+                    fb['provider'] = 'fallback'
+                    return fb
             else:
-                return generate_fallback_insights(summary, title)
-        
-        # Validate structure
+                fb = generate_fallback_insights(summary, title)
+                fb['provider'] = 'fallback'
+                return fb
+
         required_keys = ['keyInsights', 'implications', 'recommendations', 'questions']
         for key in required_keys:
             if key not in insights:
                 print(f"⚠️ Missing key in response: {key}")
-                return generate_fallback_insights(summary, title)
-            
-            # Ensure each key has at least one item
-            if not insights[key] or len(insights[key]) == 0:
+                fb = generate_fallback_insights(summary, title)
+                fb['provider'] = 'fallback'
+                return fb
+            if not insights[key]:
                 insights[key] = [f"Analysis pending for {key}"]
-        
+
+        insights['provider'] = 'gemini'
         print("✓ Successfully generated insights with Gemini")
         return insights
-    
+
     except Exception as e:
         print(f"❌ Gemini insight generation error: {e}")
-        print(f"Error type: {type(e).__name__}")
-        return generate_fallback_insights(summary, title)
-
-    
-    except Exception as e:
-        print(f"Gemini insight generation error: {e}")
-        return generate_fallback_insights(summary, title)
+        fb = generate_fallback_insights(summary, title)
+        fb['provider'] = 'fallback'
+        return fb
 
 def generate_fallback_insights(summary, title):
     """Generate basic insights without API"""
@@ -363,7 +619,9 @@ def generate_fallback_insights(summary, title):
 def answer_question_with_gemini(question, context, history):
     """Answer user questions about the paper using Gemini"""
     try:
-        if not GOOGLE_API_KEY:
+        if not GOOGLE_API_KEY or gemini_client is None:
+            if GOOGLE_API_KEY and gemini_client is None:
+                init_gemini(silent=True)
             return "API key not configured. Please set GOOGLE_API_KEY environment variable."
         
         # Build conversation history
@@ -388,8 +646,11 @@ def answer_question_with_gemini(question, context, history):
         Provide a clear, concise answer based on the paper summary and context. If the question cannot be answered from the available information, say so honestly. Keep your answer focused and informative.
         """
         
-        response = gemini_model.generate_content(prompt)
-        answer = response.text.strip()
+        response = gemini_client.models.generate_content(
+            model=gemini_model_name,
+            contents=prompt
+        )
+        answer = (response.text or "").strip()
         
         return answer
     
@@ -591,6 +852,99 @@ def summarize_youtube():
         
         return jsonify({
             'paper_info': metadata,
+            'summary': summary,
+            'insights': insights,
+            'session_id': session_id,
+            'success': True
+        })
+    
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/summarize/url', methods=['POST'])
+def summarize_generic_url():
+    """Summarize arbitrary URL (HTML or PDF)."""
+    try:
+        data = request.json
+        url = data.get('url')
+        summary_length = data.get('summary_length', 'medium')
+        model_type = data.get('model_type', 'abstractive')
+        if not url:
+            return jsonify({'error': 'URL is required'}), 400
+        if not re.match(r'^https?://', url):
+            return jsonify({'error': 'URL must start with http:// or https://'}), 400
+        raw_text = fetch_generic_url_content(url)
+        clean_full_text = clean_text(raw_text)
+        if model_type == 'abstractive':
+            summary = summarize_with_gemini(clean_full_text, summary_length)
+        else:
+            summary = summarize_extractive(clean_full_text, summary_length)
+        title_guess = url.split('/')[-1] or 'Web Document'
+        paper_info = {
+            'title': title_guess[:120],
+            'authors': 'Web Source',
+            'published': 'N/A',
+            'source_url': url
+        }
+        insights = generate_insights_with_gemini(summary, paper_info['title'], clean_full_text)
+        session_id = 'url_' + str(hash(url))
+        paper_contexts[session_id] = {
+            'title': paper_info['title'],
+            'summary': summary,
+            'full_text': clean_full_text[:10000]
+        }
+        return jsonify({
+            'paper_info': paper_info,
+            'summary': summary,
+            'insights': insights,
+            'session_id': session_id,
+            'success': True
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/summarize/drive', methods=['POST'])
+def summarize_google_drive():
+    """Summarize Google Drive shared document (PDF or Docs)."""
+    try:
+        data = request.json
+        drive_url = data.get('drive_url')
+        summary_length = data.get('summary_length', 'medium')
+        model_type = data.get('model_type', 'abstractive')
+        
+        if not drive_url:
+            return jsonify({'error': 'Google Drive URL is required'}), 400
+        
+        if 'drive.google.com' not in drive_url:
+            return jsonify({'error': 'Invalid Google Drive URL'}), 400
+        
+        raw_text = fetch_google_drive_document(drive_url)
+        clean_full_text = clean_text(raw_text)
+        
+        if model_type == 'abstractive':
+            summary = summarize_with_gemini(clean_full_text, summary_length)
+        else:
+            summary = summarize_extractive(clean_full_text, summary_length)
+        
+        file_id = extract_drive_file_id(drive_url)
+        paper_info = {
+            'title': f'Google Drive Document ({file_id[:8]}...)',
+            'authors': 'Google Drive',
+            'published': 'N/A',
+            'source_url': drive_url
+        }
+        
+        insights = generate_insights_with_gemini(summary, paper_info['title'], clean_full_text)
+        
+        session_id = 'drive_' + file_id
+        paper_contexts[session_id] = {
+            'title': paper_info['title'],
+            'summary': summary,
+            'full_text': clean_full_text[:10000]
+        }
+        
+        return jsonify({
+            'paper_info': paper_info,
             'summary': summary,
             'insights': insights,
             'session_id': session_id,
